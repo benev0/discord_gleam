@@ -17,7 +17,11 @@ pub fn main(token: String, client_id: String, guild_id: String) {
     discord_gleam.bot(
       token,
       client_id,
-      intents.Intents(message_content: True, guild_messages: True),
+      intents.Intents(
+        ..intents.empty_intents(),
+        message_content: True,
+        guild_messages: True,
+      ),
     )
 
   let test_cmd =
