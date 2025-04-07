@@ -1,16 +1,20 @@
 import bravo
 import bravo/uset
 import discord_gleam/discord/intents
+import discord_gleam/discord/snowflake
 import discord_gleam/event_handler
 import discord_gleam/http/endpoints
 import discord_gleam/types/bot
 import discord_gleam/types/message
 import discord_gleam/types/reply
 import discord_gleam/types/slash_command
+import discord_gleam/types/user
 import discord_gleam/ws/event_loop
 import discord_gleam/ws/packets/interaction_create
 import gleam/list
 import gleam/option
+import gleam/pair
+import gleam/result
 
 pub fn bot(
   token: String,
@@ -21,10 +25,10 @@ pub fn bot(
     token: token,
     client_id: client_id,
     intents: intents,
-    cache: bot.Cache(messages: case uset.new("MessagesCache", 1, bravo.Public) {
-      Ok(cache) -> option.Some(cache)
-      Error(_) -> option.None
-    }),
+    cache: bot.Cache(
+      messages: uset.new("MessagesCache", 1, bravo.Public) |> option.from_result,
+      users: uset.new("UserCache", 1, bravo.Public) |> option.from_result,
+    ),
   )
 }
 
@@ -124,4 +128,45 @@ pub fn interaction_reply_message(
   ephemeral: Bool,
 ) -> #(String, String) {
   endpoints.interaction_send_text(interaction, message, ephemeral)
+}
+
+fn check_cache(
+  cache: option.Option(uset.USet(#(k, v))),
+  key: k,
+  miss: fn(k) -> Result(v, a),
+) -> option.Option(v) {
+  case cache {
+    option.Some(cache) -> {
+      let cache_result = uset.lookup(cache, key)
+
+      let cache_result = {
+        use val <- result.map(cache_result)
+        pair.second(val)
+      }
+
+      let cache_result = {
+        use _ <- result.try_recover(cache_result)
+        case miss(key) {
+          Ok(data) -> {
+            uset.insert(cache, [#(key, data)])
+            Ok(data)
+          }
+          err -> err
+        }
+      }
+
+      cache_result |> option.from_result
+    }
+    option.None -> {
+      miss(key) |> option.from_result
+    }
+  }
+}
+
+pub fn get_user(
+  bot: bot.Bot,
+  user_id: snowflake.Snowflake,
+) -> option.Option(user.User) {
+  use key <- check_cache(bot.cache.users, user_id)
+  endpoints.get_user(bot.token, key)
 }

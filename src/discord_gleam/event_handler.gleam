@@ -29,11 +29,8 @@ fn internal_handler(bot: bot.Bot, packet: Packet) -> Nil {
 
           Nil
         }
-        option.None -> {
-          Nil
-        }
+        option.None -> Nil
       }
-      Nil
     }
     _ -> Nil
   }

@@ -1,3 +1,4 @@
+import discord_gleam/discord/snowflake
 import discord_gleam/http/request
 import discord_gleam/internal/error
 import discord_gleam/types/message
@@ -10,6 +11,7 @@ import gleam/hackney
 import gleam/http
 import gleam/http/response
 import gleam/io
+import gleam/result
 import logging
 
 pub fn me(token: String) -> Result(user.User, error.DiscordError) {
@@ -431,6 +433,35 @@ pub fn interaction_send_text(
       io.debug(err)
 
       #("FAILED", "ERROR")
+    }
+  }
+}
+
+pub fn get_user(token: String, id: snowflake.Snowflake) {
+  let request = request.new_auth(http.Get, "/users/" <> id, token)
+
+  case hackney.send(request) {
+    Ok(resp) -> {
+      case resp.status {
+        200 -> {
+          logging.log(logging.Debug, "got user")
+          let parse = user.from_json_string(resp.body)
+          use _ <- result.map_error(parse)
+          "Failed to parse user data: " <> resp.body
+        }
+        _ -> {
+          logging.log(logging.Error, "Failed to send Get User Response")
+          io.debug(resp.body)
+
+          Error(resp.body)
+        }
+      }
+    }
+    Error(err) -> {
+      logging.log(logging.Error, "Error while ")
+      io.debug(err)
+
+      Error("ERROR")
     }
   }
 }
